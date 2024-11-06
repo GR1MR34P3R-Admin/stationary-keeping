@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stationery Issuance & Inventory Control</title>
+  <style>
+    /* CSS styling (unchanged) */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .inventory-table, .issuance-form, .log {
+      background: #fff;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    table, th, td {
+      border: 1px solid #ddd;
+    }
+    th, td {
+      padding: 10px;
+      text-align: left;
+    }
+    th {
+      background-color: #007bff;
+      color: #fff;
+    }
+    .btn {
+      padding: 8px 16px;
+      color: #fff;
+      background-color: #007bff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background-color: #0056b3;
+    }
+    .btn-secondary {
+      background-color: #6c757d;
+    }
+    .form-control {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .log-entry {
+      margin-bottom: 8px;
+      padding: 8px;
+      background-color: #f1f1f1;
+      border-left: 4px solid #007bff;
+    }
+  </style>
+  <!-- SheetJS library for exporting to Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Stationery Issuance & Inventory Control</h1>
+    
+    <!-- Inventory Table -->
+    <div class="inventory-table">
+      <h2>Inventory</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Quantity Left</th>
+            <th>Update Quantity</th>
+          </tr>
+        </thead>
+        <tbody id="inventoryTable">
+          <!-- Dynamic inventory items will be populated here -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Issuance Form -->
+    <div class="issuance-form">
+      <h2>Issue Item</h2>
+      <form id="issuanceForm">
+        <input type="text" class="form-control" id="personName" placeholder="Enter person’s name" required>
+        <input type="text" class="form-control" id="department" placeholder="Enter department" required>
+        <select class="form-control" id="itemDropdown" required>
+          <!-- Options will be dynamically populated -->
+        </select>
+        <input type="number" class="form-control" id="issueQuantity" placeholder="Enter quantity to issue" min="1" required>
+        <button type="submit" class="btn">Issue</button>
+      </form>
+    </div>
+
+    <!-- Past Issuances Log -->
+    <div class="log">
+      <h2>Past Issuances</h2>
+      <div id="issuanceLog">
+        <!-- Past issuances will be listed here -->
+      </div>
+      <!-- Export to Excel Button -->
+      <button class="btn" onclick="exportLogToExcel()">Export Log to Excel</button>
+    </div>
+  </div>
+
+  <script>
+    // Sample inventory data
+    const inventory = [
+      { name: 'Pens', quantity: 100 },
+      { name: 'Notebooks', quantity: 50 },
+      { name: 'Markers', quantity: 20 },
+    ];
+
+    // Past issuances log
+    const issuanceLog = [];
+
+    // Load inventory table and dropdown
+    function loadInventory() {
+      const inventoryTable = document.getElementById('inventoryTable');
+      const itemDropdown = document.getElementById('itemDropdown');
+
+      inventoryTable.innerHTML = '';
+      itemDropdown.innerHTML = '';
+
+      inventory.forEach((item, index) => {
+        const row = document.createElement('tr');
+
+        row.innerHTML = `
+          <td>${item.name}</td>
+          <td>${item.quantity}</td>
+          <td>
+            <input type="number" min="1" placeholder="Add stock" id="quantityInput${index}" class="form-control">
+            <button class="btn btn-secondary" onclick="updateQuantity(${index})">Update</button>
+          </td>
+        `;
+        inventoryTable.appendChild(row);
+
+        // Add to dropdown
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = item.name;
+        itemDropdown.appendChild(option);
+      });
+    }
+
+    // Update quantity for a specific item
+    function updateQuantity(index) {
+      const input = document.getElementById(`quantityInput${index}`);
+      const addedQuantity = parseInt(input.value);
+      
+      if (addedQuantity > 0) {
+        inventory[index].quantity += addedQuantity;
+        loadInventory();
+        input.value = '';
+      } else {
+        alert("Please enter a valid quantity.");
+      }
+    }
+
+    // Handle issuance form submission
+    document.getElementById('issuanceForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+      
+      const itemIndex = document.getElementById('itemDropdown').value;
+      const issueQuantity = parseInt(document.getElementById('issueQuantity').value);
+      const personName = document.getElementById('personName').value;
+      const department = document.getElementById('department').value;
+      
+      if (issueQuantity > 0 && issueQuantity <= inventory[itemIndex].quantity) {
+        inventory[itemIndex].quantity -= issueQuantity;
+        
+        // Log issuance
+        const logEntry = {
+          person: personName,
+          department: department,
+          item: inventory[itemIndex].name,
+          quantity: issueQuantity,
+          date: new Date().toLocaleString()
+        };
+        issuanceLog.unshift(logEntry);
+        
+        // Reload inventory and log
+        loadInventory();
+        loadLog();
+        
+        // Reset form
+        document.getElementById('issuanceForm').reset();
+      } else {
+        alert("Insufficient stock or invalid quantity.");
+      }
+    });
+
+    // Load issuance log
+    function loadLog() {
+      const log = document.getElementById('issuanceLog');
+      log.innerHTML = issuanceLog.map(entry => `
+        <div class="log-entry">
+          ${entry.date} - ${entry.person} from ${entry.department} issued ${entry.quantity} of ${entry.item}
+        </div>
+      `).join('');
+    }
+
+    // Export issuance log to Excel
+    function exportLogToExcel() {
+      // Create a worksheet from the issuanceLog array
+      const ws = XLSX.utils.json_to_sheet(issuanceLog);
+      // Create a workbook and append the worksheet
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Issuance Log");
+      // Export the workbook
+      XLSX.writeFile(wb, "Issuance_Log.xlsx");
+    }
+
+    // Initialize the interface
+    loadInventory();
+    loadLog();
+  </script>
+  
+ <style>
+	.copyright {
+		font-size: 14px; /* General size for the main text */
+	}
+
+	.symbol {
+		font-size: 24px; /* Adjust the © symbol size as needed */
+		vertical-align: middle; /* Use middle, top, or bottom, or adjust as needed */
+		position: relative;
+		top: -3px; /* Adjust this value to control vertical positioning */
+	}
+    </style>
+
+<p class="copyright">
+    <span class="symbol">&copy;</span> All Rights & Coding Reserved by Keanen Clarke-Halkett.
+</p>
+
+
+</body>
+</html>
